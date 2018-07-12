@@ -53,8 +53,19 @@ function loadContentNetworkFirst() {
         messageSaveError();
         console.warn(err);
       });
-    }).catch(err => { // if we can't connect to the server...
+    }).catch(err => {
+    // ネットワークが繋がっていない場合こちらが実行される
     console.log('Network requests have failed, this is expected if offline');
+    getLocalEventData()
+      .then(offlineData => {
+        // 保存されているローカルデータがない場合
+        if (!offlineData.length) {
+          messageNoData();
+        } else {
+          messageOffline();
+          updateUI(offlineData);
+        }
+      });
   });
 }
 
@@ -168,5 +179,14 @@ function saveEventDataLocally(events) {
         tx.abort();
         throw Error('Events were not added to the store');
       });
+  });
+}
+
+function getLocalEventData() {
+  if (!('indexedDB' in window)) {return null;}
+  return dbPromise.then(db => {
+    const tx = db.transaction('events', 'readonly');
+    const store = tx.objectStore('events');
+    return store.getAll();
   });
 }
