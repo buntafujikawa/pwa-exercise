@@ -19,12 +19,22 @@ const noDataMessage = document.getElementById('no-data');
 const dataSavedMessage = document.getElementById('data-saved');
 const saveErrorMessage = document.getElementById('save-error');
 const addEventButton = document.getElementById('add-event-button');
+const dbPromise = createIndexedDB();
 
 addEventButton.addEventListener('click', addAndPostEvent);
 
 Notification.requestPermission();
 
-// TODO - create indexedDB database
+// chromeのdevtoolsのstorage > indexedDBのdashboardrデータベースを作成して、バージョン番号1をつける
+function createIndexedDB() {
+  if (!('indexedDB' in window)) {return null;}
+  return idb.open('dashboardr', 1, function(upgradeDb) {
+    // オブジェクトストアはRDBでいうテーブルでeventsというオブジェクトストアを作成
+    if (!upgradeDb.objectStoreNames.contains('events')) {
+      const eventsOS = upgradeDb.createObjectStore('events', {keyPath: 'id'});
+    }
+  });
+}
 
 loadContentNetworkFirst();
 
