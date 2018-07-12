@@ -25,17 +25,6 @@ addEventButton.addEventListener('click', addAndPostEvent);
 
 Notification.requestPermission();
 
-// chromeのdevtoolsのstorage > indexedDBのdashboardrデータベースを作成して、バージョン番号1をつける
-function createIndexedDB() {
-  if (!('indexedDB' in window)) {return null;}
-  return idb.open('dashboardr', 1, function(upgradeDb) {
-    // オブジェクトストアはRDBでいうテーブルでeventsというオブジェクトストアを作成
-    if (!upgradeDb.objectStoreNames.contains('events')) {
-      const eventsOS = upgradeDb.createObjectStore('events', {keyPath: 'id'});
-    }
-  });
-}
-
 loadContentNetworkFirst();
 
 if ('serviceWorker' in navigator) {
@@ -50,11 +39,21 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+// サーバのデータを受信すると、IndexedDBとページを更新する
+// データが正常に保存されると、タイムスタンプが保存され、データがオフラインで使用できることがユーザーに通知される
 function loadContentNetworkFirst() {
   getServerData()
-  .then(dataFromNetwork => {
-    updateUI(dataFromNetwork);
-  }).catch(err => { // if we can't connect to the server...
+    .then(dataFromNetwork => {
+      updateUI(dataFromNetwork);
+      saveEventDataLocally(dataFromNetwork)
+        .then(() => {
+          setLastUpdated(new Date());
+          messageDataSaved();
+        }).catch(err => {
+        messageSaveError();
+        console.warn(err);
+      });
+    }).catch(err => { // if we can't connect to the server...
     console.log('Network requests have failed, this is expected if offline');
   });
 }
@@ -81,7 +80,7 @@ function addAndPostEvent(e) {
   };
   updateUI([data]);
 
-  // TODO - save event data locally
+  saveEventDataLocally([data]);
 
   const headers = new Headers({'Content-Type': 'application/json'});
   const body = JSON.stringify(data);
@@ -143,4 +142,31 @@ function getLastUpdated() {
 
 function setLastUpdated(date) {
   localStorage.setItem('lastUpdated', date);
+}
+
+/* IndexedDB functions */
+
+// chromeのdevtoolsのstorage > indexedDBのdashboardrデータベースを作成して、バージョン番号1をつける
+function createIndexedDB() {
+  if (!('indexedDB' in window)) {return null;}
+  return idb.open('dashboardr', 1, function(upgradeDb) {
+    // オブジェクトストアはRDBでいうテーブルでeventsというオブジェクトストアを作成
+    if (!upgradeDb.objectStoreNames.contains('events')) {
+      const eventsOS = upgradeDb.createObjectStore('events', {keyPath: 'id'});
+    }
+  });
+}
+
+// オブジェクトの配列を受け取り、IndexedDBデータベースに各オブジェクトを追加
+function saveEventDataLocally(events) {
+  if (!('indexedDB' in window)) {return null;}
+  return dbPromise.then(db => {
+    const tx = db.transaction('events', 'readwrite');
+    const store = tx.objectStore('events');
+    return Promise.all(events.map(event => store.put(event)))
+      .catch(() => {
+        tx.abort();
+        throw Error('Events were not added to the store');
+      });
+  });
 }
