@@ -7,7 +7,8 @@ module.exports = {
     "images/home/*.jpg",
     "images/icon/*.svg",
     "pages/offline.html",
-    "pages/404.html"
+    "pages/404.html",
+    "pages/post*.html"
   ],
   "swSrc": "src/sw.js",
   "swDest": "build/sw.js",
